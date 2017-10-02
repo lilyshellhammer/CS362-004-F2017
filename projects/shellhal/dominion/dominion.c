@@ -5,6 +5,13 @@
 #include <math.h>
 #include <stdlib.h>
 
+/*My implementation of function decomposition for 5 cards*/
+int adventurer_play(int *z, int currentPlayer, int cardDrawn, int *drawntreasure, int *temphand[], struct gameState *state);
+int smithy_play(int *i, int handPos, int currentPlayer, struct gameState *state);
+int mine_play(int *i, int *j, int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state);
+int ambassador_play(int *i, int *j, int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state);
+int embargo_play(int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state);
+
 int compare(const void* a, const void* b) {
   if (*(int*)a > *(int*)b)
     return 1;
@@ -643,12 +650,180 @@ int getCost(int cardNumber)
   return -1;
 }
 
+/* 
+* Function Name: adventurer()
+* Description: Keep drawing til you get a treasure
+* Bugs introduced: 
+*/
+int adventurer_play(int *z, int currentPlayer, int cardDrawn, int *drawntreasure, int *temphand[], struct gameState *state){
+  while((*drawntreasure)<2){
+        if (state->deckCount[currentPlayer] <1){//if the deck is empty we need to shuffle discard and add to deck
+          shuffle(currentPlayer, state);
+        }
+        drawCard(currentPlayer, state);
+        cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer]-1];//top card of hand is most recently drawn card.
+        if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
+          (*drawntreasure)++;
+        else{
+          (*temphand)[*z]=cardDrawn;
+          state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
+          (*z)++;
+        }
+      }
+      while(z-1>=0){
+        state->discard[currentPlayer][state->discardCount[currentPlayer]++]=(*temphand)[(*z)-1]; // discard all cards in play that have been drawn
+         (*z)=(*z)-1;
+      }
+      return 0;
+}
+
+/* 
+* Function Name: adventurer()
+* Description: Keep drawing til you get a treasure
+* Bugs introduced: 
+*/
+int smithy_play(int *i, int handPos, int currentPlayer, struct gameState *state){
+    //+3 Cards
+    for ((*i )= 0; (*i) < 3; (*i)++)
+    {
+      drawCard(currentPlayer, state);
+    }
+    
+    //discard card from hand
+    discardCard(handPos, currentPlayer, state, 0);
+    return 0;
+}
+
+/* 
+* Function Name: mine_play()
+* Description: Trash your coppers to gain silvers and trash your silvers to gain golds
+       Can also trash and gain other Kingdom treasures. You can gained cards immediately.
+* Bugs introduced: 
+*/
+int mine_play(int *i, int *j, int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state){
+    (*j) = state->hand[currentPlayer][choice1];  //store card we will trash
+
+    if (state->hand[currentPlayer][choice1] < copper || state->hand[currentPlayer][choice1] > gold)
+        return -1;
+        
+    if (choice2 > treasure_map || choice2 < curse)
+        return -1;
+
+    if ( (getCost(state->hand[currentPlayer][choice1]) + 3) > getCost(choice2) )
+        return -1;
+
+    gainCard(choice2, state, 2, currentPlayer);
+
+    //discard card from hand
+    discardCard(handPos, currentPlayer, state, 0);
+
+    //discard trashed card
+    for ((*i) = 0; (*i) < state->handCount[currentPlayer]; (*i)++)
+    {
+      if (state->hand[currentPlayer][*i] == *j)
+        {
+          discardCard(i, currentPlayer, state, 0);      
+          return 1;
+        }
+    }
+    return 0;
+}
+
+/* 
+* Function Name: ambassador_play()
+* Description: When played, pick up 2 copies of a card from your hand to the supply.
+        Then all opponents gain a copy of that card.
+        Clears out your deck like a trasher. So fills opponents decks with junk. Powerful opener.
+* Bugs introduced: 
+*/
+int ambassador_play(int *i, int *j, int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state){
+  (*j) = 0;    //used to check if player has enough cards to discard
+
+  if (choice2 > 2 || choice2 < 0)
+    return -1;        
+  if (choice1 == handPos)
+    return -1;
+
+  for((*i) = 0; (*i) < state->handCount[currentPlayer]; (*i)++)
+  {
+    if ((*i) != handPos && (*i) == state->hand[currentPlayer][choice1] && (*i) != choice1)
+      {
+        (*j)++;
+      }
+  }
+  if ((*j) < choice2)
+    return -1;   
+
+
+  if (DEBUG) 
+  printf("Player %d reveals card number: %d\n", currentPlayer, state->hand[currentPlayer][choice1]);
+
+  //increase supply count for choosen card by amount being discarded
+  state->supplyCount[state->hand[currentPlayer][choice1]] += choice2;
+  
+  //each other player gains a copy of revealed card
+  for (i = 0; i < state->numPlayers; i++)
+  {
+    if (i != currentPlayer)
+        gainCard(state->hand[currentPlayer][choice1], state, 0, i);
+  }
+
+  //discard played card from hand
+  discardCard(handPos, currentPlayer, state, 0);      
+
+  //trash copies of cards returned to supply
+  for((*j) = 0; (*j) < choice2; (*j)++)
+  {
+    for ((*i) = 0; (*i) < state->handCount[currentPlayer]; (*i)++)
+      {
+        if (state->hand[currentPlayer][(*i)] == state->hand[currentPlayer][choice1])
+          {
+            discardCard(i, currentPlayer, state, 1);
+            return 1;
+          }
+      }
+  }     
+
+  return 0;
+}
+
+/* 
+* Function Name: embargo_play()
+* Description: One shot terminal silver. Adds a penalty to the supply pile (whoever
+      buys a card from that pile gains a Curse, which could be avoided with gainers or 
+      letting curse run out. Affects all players)
+* Bugs introduced: 
+*/
+int embargo_play(int choice1, int choice2, int handPos, int currentPlayer, struct gameState *state){
+  //+2 Coins
+  state->coins = state->coins + 2;
+      
+  //see if selected pile is in play
+  if ( state->supplyCount[choice1] == -1 )
+      return -1;
+      
+  //add embargo token to selected supply pile
+  state->embargoTokens[choice1]++;
+  
+  //trash card
+  discardCard(handPos, currentPlayer, state, 1);    
+  return 0;
+}
+
+/******************************************************************************
+* Function Name: cardEffect
+* Description: Executes different code (or functions in the case of 5 cards) 
+      depending on the card. 
+******************************************************************************/
 int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState *state, int handPos, int *bonus)
 {
   int i;
   int j;
   int k;
   int x;
+  int ap; //FOR MY Ambassador FUNCTION RETURN VALUE
+  int mp; //"" Mine ""
+  int ep; //"" Embargo
   int index;
   int currentPlayer = whoseTurn(state);
   int nextPlayer = currentPlayer + 1;
@@ -667,24 +842,8 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
   switch( card ) 
     {
     case adventurer:
-      while(drawntreasure<2){
-	if (state->deckCount[currentPlayer] <1){//if the deck is empty we need to shuffle discard and add to deck
-	  shuffle(currentPlayer, state);
-	}
-	drawCard(currentPlayer, state);
-	cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer]-1];//top card of hand is most recently drawn card.
-	if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
-	  drawntreasure++;
-	else{
-	  temphand[z]=cardDrawn;
-	  state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
-	  z++;
-	}
-      }
-      while(z-1>=0){
-	state->discard[currentPlayer][state->discardCount[currentPlayer]++]=temphand[z-1]; // discard all cards in play that have been drawn
-	z=z-1;
-      }
+    //****************************** Adventurer ************************************
+      adventurer_play(z, currentPlayer, cardDrawn,drawntreasure, &temphand, state);
       return 0;
 			
     case council_room:
@@ -768,40 +927,15 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
       return -1;
 			
     case mine:
-      j = state->hand[currentPlayer][choice1];  //store card we will trash
-
-      if (state->hand[currentPlayer][choice1] < copper || state->hand[currentPlayer][choice1] > gold)
-	{
-	  return -1;
-	}
-		
-      if (choice2 > treasure_map || choice2 < curse)
-	{
-	  return -1;
-	}
-
-      if ( (getCost(state->hand[currentPlayer][choice1]) + 3) > getCost(choice2) )
-	{
-	  return -1;
-	}
-
-      gainCard(choice2, state, 2, currentPlayer);
-
-      //discard card from hand
-      discardCard(handPos, currentPlayer, state, 0);
-
-      //discard trashed card
-      for (i = 0; i < state->handCount[currentPlayer]; i++)
-	{
-	  if (state->hand[currentPlayer][i] == j)
-	    {
-	      discardCard(i, currentPlayer, state, 0);			
-	      break;
-	    }
-	}
-			
-      return 0;
-			
+    //****************************** Mine ************************************
+      mp = mine_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
+      if( mp == 1)
+        break;
+      else if (mp == -1)
+        return -1;
+      else
+        return 0;
+      
     case remodel:
       j = state->hand[currentPlayer][choice1];  //store card we will trash
 
@@ -829,14 +963,8 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
       return 0;
 		
     case smithy:
-      //+3 Cards
-      for (i = 0; i < 3; i++)
-	{
-	  drawCard(currentPlayer, state);
-	}
-			
-      //discard card from hand
-      discardCard(handPos, currentPlayer, state, 0);
+    //****************************** Smithy ************************************
+      smithy_play(&i, handPos, currentPlayer, state);
       return 0;
 		
     case village:
@@ -1046,63 +1174,15 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
       return 0;
 		
     case ambassador:
-      j = 0;		//used to check if player has enough cards to discard
-
-      if (choice2 > 2 || choice2 < 0)
-	{
-	  return -1;				
-	}
-
-      if (choice1 == handPos)
-	{
-	  return -1;
-	}
-
-      for (i = 0; i < state->handCount[currentPlayer]; i++)
-	{
-	  if (i != handPos && i == state->hand[currentPlayer][choice1] && i != choice1)
-	    {
-	      j++;
-	    }
-	}
-      if (j < choice2)
-	{
-	  return -1;				
-	}
-
-      if (DEBUG) 
-	printf("Player %d reveals card number: %d\n", currentPlayer, state->hand[currentPlayer][choice1]);
-
-      //increase supply count for choosen card by amount being discarded
-      state->supplyCount[state->hand[currentPlayer][choice1]] += choice2;
-			
-      //each other player gains a copy of revealed card
-      for (i = 0; i < state->numPlayers; i++)
-	{
-	  if (i != currentPlayer)
-	    {
-	      gainCard(state->hand[currentPlayer][choice1], state, 0, i);
-	    }
-	}
-
-      //discard played card from hand
-      discardCard(handPos, currentPlayer, state, 0);			
-
-      //trash copies of cards returned to supply
-      for (j = 0; j < choice2; j++)
-	{
-	  for (i = 0; i < state->handCount[currentPlayer]; i++)
-	    {
-	      if (state->hand[currentPlayer][i] == state->hand[currentPlayer][choice1])
-		{
-		  discardCard(i, currentPlayer, state, 1);
-		  break;
-		}
-	    }
-	}			
-
+    //****************************** Adventurer ************************************
+    ap = ambassador_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
+		if(ap == -1)
+      return -1;
+    else if(ap == 1)
+      break;
+    else
       return 0;
-		
+
     case cutpurse:
 
       updateCoins(currentPlayer, state, 2);
@@ -1139,21 +1219,13 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
 
 		
     case embargo: 
-      //+2 Coins
-      state->coins = state->coins + 2;
-			
-      //see if selected pile is in play
-      if ( state->supplyCount[choice1] == -1 )
-	{
-	  return -1;
-	}
-			
-      //add embargo token to selected supply pile
-      state->embargoTokens[choice1]++;
-			
-      //trash card
-      discardCard(handPos, currentPlayer, state, 1);		
-      return 0;
+    //******************************* Embargo ******************************
+      ep = embargo_play(choice1, choice2, handPos, currentPlayer, state);
+      if (ep == -1)
+        return -1;
+      else
+        return 0;
+
 		
     case outpost:
       //set outpost flag
@@ -1330,4 +1402,4 @@ int updateCoins(int player, struct gameState *state, int bonus)
 
 
 //end of dominion.c
-
+                                                                                                                                                                                                                                                                                  
