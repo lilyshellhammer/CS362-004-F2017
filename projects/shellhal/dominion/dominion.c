@@ -667,7 +667,7 @@ int adventurer_play(int *z, int currentPlayer, int cardDrawn, int *drawntreasure
         else{
           (*temphand)[*z]=cardDrawn;
           state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
-          (*z)++;
+          //(*z)++;  BUG #1: Took out increment for position in hand. Will write card info over hand and not move to next spot.
         }
       }
       while(z-1>=0){
@@ -689,8 +689,7 @@ int smithy_play(int *i, int handPos, int currentPlayer, struct gameState *state)
       drawCard(currentPlayer, state);
     }
     
-    //discard card from hand
-    discardCard(handPos, currentPlayer, state, 0);
+    //discardCard(handPos, currentPlayer, state, 0); //BUG #2: Doesn't discard smithy
     return 0;
 }
 
@@ -845,7 +844,36 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
     //****************************** Adventurer ************************************
       adventurer_play(z, currentPlayer, cardDrawn,drawntreasure, &temphand, state);
       return 0;
-			
+		case smithy:
+      //****************************** Smithy ************************************
+      smithy_play(&i, handPos, currentPlayer, state);
+      return 0;
+    case mine:
+      //****************************** Mine ************************************
+      mp = mine_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
+      if( mp == 1)
+        break;
+      else if (mp == -1)
+        return -1;
+      else
+        return 0;
+    case ambassador:
+      //****************************** Adventurer ************************************
+      ap = ambassador_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
+      if(ap == -1)
+        return -1;
+      else if(ap == 1)
+        break;
+      else
+        return 0;
+    case embargo: 
+      //******************************* Embargo ******************************
+      ep = embargo_play(choice1, choice2, handPos, currentPlayer, state);
+      if (ep == -1)
+        return -1;
+      else
+        return 0;
+
     case council_room:
       //+4 Cards
       for (i = 0; i < 4; i++)
@@ -925,16 +953,6 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
 			
     case gardens:
       return -1;
-			
-    case mine:
-    //****************************** Mine ************************************
-      mp = mine_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
-      if( mp == 1)
-        break;
-      else if (mp == -1)
-        return -1;
-      else
-        return 0;
       
     case remodel:
       j = state->hand[currentPlayer][choice1];  //store card we will trash
@@ -960,11 +978,6 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
 	}
 
 
-      return 0;
-		
-    case smithy:
-    //****************************** Smithy ************************************
-      smithy_play(&i, handPos, currentPlayer, state);
       return 0;
 		
     case village:
@@ -1173,15 +1186,6 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
 	    
       return 0;
 		
-    case ambassador:
-    //****************************** Adventurer ************************************
-    ap = ambassador_play(&i, &j, choice1, choice2, handPos, currentPlayer, state);
-		if(ap == -1)
-      return -1;
-    else if(ap == 1)
-      break;
-    else
-      return 0;
 
     case cutpurse:
 
@@ -1216,16 +1220,6 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
       discardCard(handPos, currentPlayer, state, 0);			
 
       return 0;
-
-		
-    case embargo: 
-    //******************************* Embargo ******************************
-      ep = embargo_play(choice1, choice2, handPos, currentPlayer, state);
-      if (ep == -1)
-        return -1;
-      else
-        return 0;
-
 		
     case outpost:
       //set outpost flag
