@@ -1,0 +1,8 @@
+When running my tests on Alex’s code, I found a bug in drawCard. When the temporary deck was filled with random cards, the drawCard function didn’t return zero and did not have the correct amount of cards in the hand of the player or in the deck. This error also turned up on my own implementation of dominion, so I know the error is in the drawCard function we were given at the beginning of the course. Here were the error messages from my drawCard unit test function:
+“Testing drawCard
+ILLEGAL DRAWCARD TEST PASSEDDRAWCARD AMOUNT FAILED”
+
+I also found that the Smithy discards cards incorrectly because the size of both the pre and post gamestates (pre being manipulated in my testing function, post being added through the smithy function in dominion.c) were different. The code for smithy looks correct so the problem must be in the discardCard function. Here were the error messages from my card testing function:
+“Testing Smithy
+testsmithy return value is: -1
+SMITHY SIZE TEST FAIL”
