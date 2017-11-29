@@ -83,6 +83,7 @@ public class UrlValidatorTest extends TestCase {
     * @param testObjects Used to create a url.
     */
    public void testIsValid(Object[] testObjects, long options) {
+	   int counter = 0;
       UrlValidator urlVal = new UrlValidator(null, null, options);
       assertTrue(urlVal.isValid("http://www.google.com"));
       assertTrue(urlVal.isValid("http://www.google.com/"));
@@ -103,8 +104,9 @@ public class UrlValidatorTest extends TestCase {
          //System.out.println(testPartsIndex[0]);
          String url = testBuffer.toString();
          boolean result = urlVal.isValid(url);
-         
-         if(result == true)
+        	
+	 counter = counter +1; 
+         if(result != true)
         	 System.out.println(url);
          assertEquals(url, expected, result);
          
@@ -128,6 +130,7 @@ public class UrlValidatorTest extends TestCase {
       if (printStatus) {
          System.out.println();
       }
+      System.out.println(counter);
    }
 
    public void testValidator202() {
